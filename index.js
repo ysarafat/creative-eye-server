@@ -125,12 +125,14 @@ async function run() {
 
     // get class class 
     app.get("/classes", async(req, res) => {
-        const result = await classesCollection.find().toArray();
-        res.send(result);
+        const result = (await classesCollection.find().toArray());
+        const reversedResult = result.reverse();
+        res.send(reversedResult);
     })
     // get popular class 
     app.get("/popular-class", async(req, res)=> {
-        const result = await classesCollection.find().sort({ bookedSeats: -1 }).limit(6).toArray();
+        const query = {status: "approved"}
+        const result = await classesCollection.find(query).sort({ bookedSeats: -1 }).limit(6).toArray();
         res.send(result)
     })
     // add class 
@@ -147,6 +149,17 @@ async function run() {
         const result = await enrolledClassesCollection.find(query).toArray()
         res.send(result)
         
+    })
+    // mange class status
+    app.put('/update-status/:id', verifyUser, verifyAdmin, async(req,res)=> {
+        const id = req.params.id;
+        const {status} = req.body;
+        console.log(status)
+        const query = {_id: new ObjectId(id)};
+        const updateStatus = {$set: {status: status}};
+        const result = await classesCollection.updateOne(query, updateStatus);
+        res.send(result)
+
     })
 
     // delete enroll class by student 
