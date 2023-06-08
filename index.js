@@ -123,10 +123,15 @@ async function run() {
         res.send(result)
     })
 
-    // get class data 
+    // get class class 
     app.get("/classes", async(req, res) => {
         const result = await classesCollection.find().toArray();
         res.send(result);
+    })
+    // get popular class 
+    app.get("/popular-class", async(req, res)=> {
+        const result = await classesCollection.find().sort({ bookedSeats: -1 }).limit(6).toArray();
+        res.send(result)
     })
     // add class 
     app.post('/add-class',verifyUser, verifyInstructor, async(req, res)=> {
@@ -134,6 +139,25 @@ async function run() {
         const result = await classesCollection.insertOne(newClass)
         res.send(result)
     })
+    // get enroll class
+    app.get('/my-enrolled-class',verifyUser, async(req, res)=> {
+        const email = req.query.email;
+        console.log(email)
+        const query = {email: email}
+        const result = await enrolledClassesCollection.find(query).toArray()
+        res.send(result)
+        
+    })
+
+    // delete enroll class by student 
+    app.delete('/delete-enrolled-class/:id',  async(req, res) => {
+        const id = req.params.id;
+        const query = {_id: new ObjectId(id)};
+        const result = await enrolledClassesCollection.deleteOne(query);
+        res.send(result);
+
+    })
+
     // enrolled classes
     app.post('/enroll-class', verifyUser, async (req, res) => {
         const enrollInfo = req.body;
@@ -154,7 +178,6 @@ async function run() {
         const id = req.params.id
         const query = {_id: new ObjectId(id)}
         const filter = await classesCollection.findOne(query)
-        console.log(filter.seats)
         const options = { upsert: true };
         if (filter.seats){
             const seats = filter.bookedSeats + 1 || 1;
@@ -163,7 +186,8 @@ async function run() {
             res.send(result)
         }
     })
-    
+    // get enroll class
+
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
