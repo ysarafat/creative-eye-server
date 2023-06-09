@@ -123,11 +123,18 @@ async function run() {
         res.send(result)
     })
 
-    // get class class 
+    // get all classes
     app.get("/classes", async(req, res) => {
         const result = (await classesCollection.find().toArray());
         const reversedResult = result.reverse();
         res.send(reversedResult);
+    })
+    // get single class by class id
+    app.get('/class/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await classesCollection.findOne(query);
+      res.send(result)
     })
     // get popular class 
     app.get("/popular-class", async(req, res)=> {
@@ -135,16 +142,39 @@ async function run() {
         const result = await classesCollection.find(query).sort({ bookedSeats: -1 }).limit(6).toArray();
         res.send(result)
     })
-    // add class 
+    // add class by instructor
     app.post('/add-class',verifyUser, verifyInstructor, async(req, res)=> {
         const newClass = req.body;
         const result = await classesCollection.insertOne(newClass)
         res.send(result)
     })
-    // get enroll class
+    // update class by instructor 
+    app.put('/update-class/:id', async(req, res) => {
+      const id = req.params.id;
+      const classData = req.body;
+      const query = {_id: new ObjectId(id)};
+      const updateClass = {$set: {
+        className: classData.className,
+        classImage: classData.classImage,
+        seats: classData.seats,
+        price: classData.price,
+        classDetails: classData.classDetails,
+        status : "pending"
+      }}
+      const result = await classesCollection.updateOne(query, updateClass);
+      res.send(result)
+      
+    })
+    // get classes by instructor email
+    app.get('/instructor/my-class',verifyUser, verifyInstructor, async(req, res) => {
+      const email = req.query.email;
+      const query = {instructorEmail: email}
+      const result = await classesCollection.find(query).toArray();
+      res.send(result)
+    })
+    // get selected class by student email
     app.get('/my-enrolled-class',verifyUser, async(req, res)=> {
         const email = req.query.email;
-        console.log(email)
         const query = {email: email}
         const result = await enrolledClassesCollection.find(query).toArray()
         res.send(result)
@@ -176,28 +206,33 @@ async function run() {
         const enrollInfo = req.body;
         const classId = enrollInfo.classId
         const studentEmail = enrollInfo.email
-        const filter = {classId: classId, email:studentEmail}
-        const checkExisting = await enrolledClassesCollection.findOne(filter);
+        const filterSelect = {classId: classId, email:studentEmail}
+        const filterClass = {_id: new ObjectId(classId)}
+        const checkExisting = await enrolledClassesCollection.findOne(filterSelect);
+        const CheckSeats = await classesCollection.findOne(filterClass);
+        console.log(CheckSeats.seats, CheckSeats.bookedSeats)
         if (checkExisting){
-          return res.send({message: "Already Enrolled"})
-        }else{
-            const result = await enrolledClassesCollection.insertOne(enrollInfo);
+          return res.send({message: "You have already selected the class"})
+        }
+        else if (CheckSeats.seats === CheckSeats.bookedSeats) {
+               return res.send({message: "Our all seats is booked"})
+        } else {
+          const result = await enrolledClassesCollection.insertOne(enrollInfo);
             res.send(result)
         }
-            
         
     })
     app.put("/booked-seat/:id", async(req, res) => {
-        const id = req.params.id
-        const query = {_id: new ObjectId(id)}
-        const filter = await classesCollection.findOne(query)
-        const options = { upsert: true };
-        if (filter.seats){
-            const seats = filter.bookedSeats + 1 || 1;
-            const update = { $set: { bookedSeats: seats } };
-            const result = await classesCollection.updateOne(query, update, options)
-            res.send(result)
-        }
+      const id = req.params.id
+      const query = {_id: new ObjectId(id)}
+      const filter = await classesCollection.findOne(query)
+      const options = { upsert: true };
+      if (filter){
+          const seats = filter.bookedSeats + 1 || 1;
+          const update = { $set: { bookedSeats: seats } };
+          const result = await classesCollection.updateOne(query, update, options)
+          res.send(result)
+      }
     })
     // get enroll class
 
