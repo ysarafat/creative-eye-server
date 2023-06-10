@@ -191,6 +191,21 @@ async function run() {
         res.send(result)
 
     })
+     // sent feed back to instructor 
+     app.put('/sent-feedback/:id',verifyUser, verifyAdmin, async(req, res) => {
+      const id = req.params.id;
+      const {feedback} = req.body;
+      let saveFeedback = [];
+      const query = {_id: new ObjectId(id)}
+      const checkFeedback = await classesCollection.findOne(query);
+      const existingFeedback = checkFeedback.feedback;
+      saveFeedback = existingFeedback? [...existingFeedback, feedback] : [feedback];
+      const options = { upsert: true };
+      const updateFeedback = {$set: {feedback: saveFeedback}}
+      const result = await classesCollection.updateOne(query, updateFeedback, options)
+          res.send(result)
+    })
+
 
     // delete enroll class by student 
     app.delete('/delete-enrolled-class/:id',  async(req, res) => {
@@ -234,8 +249,7 @@ async function run() {
           res.send(result)
       }
     })
-    // get enroll class
-
+   
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
