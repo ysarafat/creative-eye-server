@@ -49,7 +49,7 @@ async function run() {
     // create jwt token
     app.post('/jwt', (req, res)=>{
         const user = req.body;
-        const token = jwt.sign(user, process.env.ACCESS_TOKEN, {expiresIn: '1h'});
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN, {expiresIn: '1d'});
         res.send({token});
       })
     //   verify admin
@@ -144,6 +144,15 @@ async function run() {
         const result = await classesCollection.find(query).sort({ bookedSeats: -1 }).limit(6).toArray();
         res.send(result)
     })
+    //  get popular instructor
+    app.get("/popular-instructor", async(req, res)=> {
+      const topClasses = await classesCollection.find().sort({ bookedSeats: -1 }).toArray();
+      const topInstructor = topClasses.map(rs => rs.instructorEmail)
+      const filterEmail = [...new  Set(topInstructor)]
+      const query = {email: {$in: filterEmail.map(email => email)}}
+      const result = await usersCollection.find(query).limit(6).toArray();
+      res.send(result)
+  })
     // add class by instructor
     app.post('/add-class',verifyUser, verifyInstructor, async(req, res)=> {
         const newClass = req.body;
@@ -172,7 +181,8 @@ async function run() {
       const email = req.query.email;
       const query = {instructorEmail: email}
       const result = await classesCollection.find(query).toArray();
-      res.send(result)
+      const reversedResult = result.reverse();
+      res.send(reversedResult);
     })
     // get selected class by student email
     app.get('/my-enrolled-class',verifyUser, async(req, res)=> {
