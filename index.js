@@ -2,6 +2,7 @@ const express = require('express')
 const { MongoClient, ServerApiVersion,ObjectId } = require('mongodb');
 const cors = require('cors')
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 5000;
@@ -43,6 +44,7 @@ async function run() {
     const usersCollection = client.db("creativeEye").collection("users")
     const classesCollection = client.db("creativeEye").collection("classes");
     const enrolledClassesCollection = client.db("creativeEye").collection("enrolledClasses")
+    const paymentCollection = client.db("creativeEye").collection("payment")
 
     // create jwt token
     app.post('/jwt', (req, res)=>{
@@ -248,6 +250,34 @@ async function run() {
           const result = await classesCollection.updateOne(query, update, options)
           res.send(result)
       }
+    })
+    // payment intent API
+    app.post('/create-payment-intent',verifyUser, async(req, res)=> {
+      const {price} = req.body;
+      const amount = parseInt(price*100);
+      const paymentIntent= await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"]
+      })
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      })
+    })
+    // save payment info
+    app.post('/payment', verifyUser, async(req, res)=>{
+      const paymentInfo = req.body;
+      const result = await paymentCollection.insertOne(paymentInfo)
+      res.send(result)
+
+    })
+    // get payment History
+    app.get('/payment-history',verifyUser, async(req, res)=> {
+      const email = req.query.email;
+      const query = {email: email};
+      const result = await paymentCollection.find().toArray;
+      const resultReverse = result.reverse()
+      res.send(resultReverse)
     })
    
     await client.db("admin").command({ ping: 1 });
