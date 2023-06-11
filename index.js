@@ -43,7 +43,7 @@ async function run() {
     await client.connect();
     const usersCollection = client.db("creativeEye").collection("users")
     const classesCollection = client.db("creativeEye").collection("classes");
-    const enrolledClassesCollection = client.db("creativeEye").collection("enrolledClasses")
+    const enrolledClassesCollection = client.db("creativeEye").collection("selectedClasses")
     const paymentCollection = client.db("creativeEye").collection("payment")
 
     // create jwt token
@@ -210,8 +210,9 @@ async function run() {
 
 
     // delete enroll class by student 
-    app.delete('/delete-enrolled-class/:id',  async(req, res) => {
+    app.delete('/delete-selected-class/:id', async(req, res) => {
         const id = req.params.id;
+        console.log(id)
         const query = {_id: new ObjectId(id)};
         const result = await enrolledClassesCollection.deleteOne(query);
         res.send(result);
@@ -219,26 +220,29 @@ async function run() {
     })
 
     // enrolled classes
-    app.post('/enroll-class', verifyUser, async (req, res) => {
+    app.post('/select-class', verifyUser, async (req, res) => {
         const enrollInfo = req.body;
         const classId = enrollInfo.classId
         const studentEmail = enrollInfo.email
         const filterSelect = {classId: classId, email:studentEmail}
         const filterClass = {_id: new ObjectId(classId)}
         const checkExisting = await enrolledClassesCollection.findOne(filterSelect);
+        const checkExistingPayment = await paymentCollection.findOne(filterSelect);
         const CheckSeats = await classesCollection.findOne(filterClass);
-        console.log(CheckSeats.seats, CheckSeats.bookedSeats)
         if (checkExisting){
           return res.send({message: "You have already selected the class"})
         }
-        else if (CheckSeats.seats === CheckSeats.bookedSeats) {
-               return res.send({message: "Our all seats is booked"})
+        else if (checkExistingPayment) {
+               return res.send({message: "You have already enrolled the class"})
+        } else if (CheckSeats.seats === CheckSeats.bookedSeats) {
+          return res.send({message: "Our all seats is booked"})
         } else {
           const result = await enrolledClassesCollection.insertOne(enrollInfo);
             res.send(result)
         }
         
     })
+
     app.put("/booked-seat/:id", async(req, res) => {
       const id = req.params.id
       const query = {_id: new ObjectId(id)}
@@ -250,6 +254,14 @@ async function run() {
           const result = await classesCollection.updateOne(query, update, options)
           res.send(result)
       }
+    })
+    app.get('/my-enrolled', verifyUser, async(req, res)=> {
+      const email = req.query.email;
+      console.log(email)
+      const query = {email: email};
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result)
+     
     })
     // payment intent API
     app.post('/create-payment-intent',verifyUser, async(req, res)=> {
@@ -267,6 +279,11 @@ async function run() {
     // save payment info
     app.post('/payment', verifyUser, async(req, res)=>{
       const paymentInfo = req.body;
+      const filterSelect = {classId: paymentInfo.classId, email:paymentInfo.email}
+        const checkExisting = await paymentCollection.findOne(filterSelect);
+        if (checkExisting){
+          return res.send({message: "You have already enroll the class"})
+        }
       const result = await paymentCollection.insertOne(paymentInfo)
       res.send(result)
 
@@ -275,9 +292,9 @@ async function run() {
     app.get('/payment-history',verifyUser, async(req, res)=> {
       const email = req.query.email;
       const query = {email: email};
-      const result = await paymentCollection.find().toArray;
-      const resultReverse = result.reverse()
-      res.send(resultReverse)
+      const result = (await paymentCollection.find(query).toArray());
+        const reversedResult = result.reverse();
+        res.send(reversedResult);
     })
    
     await client.db("admin").command({ ping: 1 });
