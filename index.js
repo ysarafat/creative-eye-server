@@ -11,7 +11,6 @@ const app = express();
 // middleware 
 app.use(cors());
 app.use(express.json());
-// user verify by jwt
 const verifyUser = (req, res, next) =>{
     const authorization = req.headers.authorization;
     if (!authorization) {
@@ -74,10 +73,15 @@ async function run() {
       }
     // save user info in database 
     app.post('/users', async(req,res)=> {
-        const userInfo = req.body;
-        const result = await usersCollection.insertOne(userInfo);
-        res.send(result)
-    })
+      const userInfo = req.body;
+     const query = {email: userInfo.email};
+     const existing = await usersCollection.findOne(query);
+     if (existing) {
+      return res.send({message: "user exist"})
+     }
+      const result = await usersCollection.insertOne(userInfo);
+      res.send(result)
+  })
 
     // get user data 
     app.get('/users',verifyUser,verifyAdmin,  async(req, res) => {
@@ -86,7 +90,7 @@ async function run() {
     })
 
     // verify user roll 
-    app.get('/user/role/:email',verifyUser, async(req,res) => {
+    app.get('/user/role/:email', async(req,res) => {
         const email = req.params.email;
         const query = {email: email};
         const result = await usersCollection.findOne(query);
@@ -153,6 +157,12 @@ async function run() {
       const result = await usersCollection.find(query).limit(6).toArray();
       res.send(result)
   })
+  // get instructor 
+  app.get('/instructors', async(req, res)=> {
+    const query = {role: 'instructor'}
+    const result = await usersCollection.find(query).toArray();
+    res.send(result)
+  })
     // add class by instructor
     app.post('/add-class',verifyUser, verifyInstructor, async(req, res)=> {
         const newClass = req.body;
@@ -196,7 +206,6 @@ async function run() {
     app.put('/update-status/:id', verifyUser, verifyAdmin, async(req,res)=> {
         const id = req.params.id;
         const {status} = req.body;
-        console.log(status)
         const query = {_id: new ObjectId(id)};
         const updateStatus = {$set: {status: status}};
         const result = await classesCollection.updateOne(query, updateStatus);
@@ -222,7 +231,6 @@ async function run() {
     // delete enroll class by student 
     app.delete('/delete-selected-class/:id', async(req, res) => {
         const id = req.params.id;
-        console.log(id)
         const query = {_id: new ObjectId(id)};
         const result = await enrolledClassesCollection.deleteOne(query);
         res.send(result);
@@ -267,7 +275,6 @@ async function run() {
     })
     app.get('/my-enrolled', verifyUser, async(req, res)=> {
       const email = req.query.email;
-      console.log(email)
       const query = {email: email};
       const result = await paymentCollection.find(query).toArray();
       res.send(result)
@@ -314,7 +321,9 @@ async function run() {
   }
 }
 run().catch(console.dir);
-
+app.get('/', (req, res) => {
+  res.send("Server Running")
+})
 
 // server listening 
 app.listen(PORT, ()=> {
